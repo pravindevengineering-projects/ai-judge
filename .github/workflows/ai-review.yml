@@ -5,6 +5,7 @@ on:
     inputs:
       reviewer-repo:
         description: "The repo containing review_bot.py, as owner/repo"
+        type: string
         required: false
         default: ""
     secrets:
