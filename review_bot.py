@@ -153,9 +153,15 @@ def already_reviewed(pull, commit_sha: str) -> bool:
     return False
 
 
-def find_bugs_for_file(client: anthropic.AnthropicBedrock, fd: FileDiff) -> list[dict]:
+@dataclass
+class FileResult:
+    findings: list[dict]
+    input_tokens: int
+    output_tokens: int
+
+
+def find_bugs_for_file(client: anthropic.AnthropicBedrock, fd: FileDiff) -> FileResult:
     """Run one Claude call for a single file's diff."""
-    # Chunk if the patch is very large.
     patch = fd.patch
     if len(patch) > MAX_CHUNK_CHARS:
         patch = patch[:MAX_CHUNK_CHARS]
@@ -172,9 +178,12 @@ def find_bugs_for_file(client: anthropic.AnthropicBedrock, fd: FileDiff) -> list
     if response.stop_reason == "max_tokens":
         print(f"  {fd.filename}: response truncated; findings may be incomplete.")
     text_block = next((b for b in response.content if b.type == "text"), None)
-    if text_block is None:
-        return []
-    return json.loads(text_block.text).get("findings", [])
+    findings = json.loads(text_block.text).get("findings", []) if text_block else []
+    return FileResult(
+        findings=findings,
+        input_tokens=response.usage.input_tokens,
+        output_tokens=response.usage.output_tokens,
+    )
 
 
 def validate_comments(findings: list[dict], files: list[FileDiff]) -> tuple[list[dict], list[dict]]:
@@ -198,11 +207,29 @@ def validate_comments(findings: list[dict], files: list[FileDiff]) -> tuple[list
     return inline, fallback
 
 
-def post_review(pull, commit_sha: str, inline: list[dict], fallback: list[dict]) -> None:
+def usage_footer(total_input: int, total_output: int) -> str:
+    input_cost = total_input * 3.00 / 1_000_000
+    output_cost = total_output * 15.00 / 1_000_000
+    return (
+        f"\n\n---\n"
+        f"<details><summary>📊 Token usage</summary>\n\n"
+        f"| | Tokens | Est. cost |\n"
+        f"|---|---|---|\n"
+        f"| Input | {total_input:,} | ${input_cost:.4f} |\n"
+        f"| Output | {total_output:,} | ${output_cost:.4f} |\n"
+        f"| **Total** | **{total_input + total_output:,}** | **${input_cost + output_cost:.4f}** |\n"
+        f"\nModel: `{MODEL}` &nbsp;·&nbsp; Region: `us-west-2`"
+        f"\n</details>"
+    )
+
+
+def post_review(pull, commit_sha: str, inline: list[dict], fallback: list[dict],
+                total_input: int = 0, total_output: int = 0) -> None:
     """Post inline comments; fall back to PR-level comment for rejected ones."""
     summary_lines = [BOT_MARKER]
     total = len(inline) + len(fallback)
     summary_lines.append(f"AI review found {total} potential logic bug(s).")
+    summary_lines.append(usage_footer(total_input, total_output))
 
     if fallback:
         summary_lines.append("\n**The following findings could not be anchored to a diff line:**")
@@ -294,17 +321,22 @@ def main() -> int:
     print(f"Reviewing {len(files)} file(s)...")
     client = anthropic.AnthropicBedrock()
     all_findings: list[dict] = []
+    total_input = total_output = 0
     for fd in files:
         print(f"  {fd.filename}")
-        findings = find_bugs_for_file(client, fd)
-        all_findings.extend(findings)
+        result = find_bugs_for_file(client, fd)
+        all_findings.extend(result.findings)
+        total_input += result.input_tokens
+        total_output += result.output_tokens
+
+    print(f"Tokens used — input: {total_input:,}, output: {total_output:,}")
 
     if not all_findings:
         print("No logic bugs found.")
         return 0
 
     inline, fallback = validate_comments(all_findings, files)
-    post_review(pull, commit_sha, inline, fallback)
+    post_review(pull, commit_sha, inline, fallback, total_input, total_output)
     return 0
 
 
