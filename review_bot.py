@@ -62,6 +62,34 @@ _SKIP_FILENAMES = {
 
 BOT_MARKER = "<!-- ai-judge-review -->"
 
+# Per-language hints injected into the user message to sharpen Claude's focus.
+LANGUAGE_HINTS: dict[str, str] = {
+    ".py":    "Pay special attention to: mutable default arguments, `is` vs `==`, silent exception swallowing (`except: pass`), integer division (`/` vs `//`), generator exhaustion.",
+    ".java":  "Pay special attention to: NullPointerException risks, `equals()` vs `==` for objects, unchecked exceptions swallowed silently, integer division truncation, off-by-one in collections.",
+    ".scala": "Pay special attention to: Option.get on None, non-exhaustive pattern matches, integer division truncation, `equals()` vs `eq()`, mutable shared state.",
+    ".kt":    "Pay special attention to: null safety operator misuse (`!!`), smart cast invalidation, integer division truncation, coroutine cancellation not handled.",
+    ".groovy":"Pay special attention to: NullPointerException, Groovy truth pitfalls (0 and '' are falsy), GString injection, dynamic dispatch surprises.",
+    ".go":    "Pay special attention to: ignored error returns, goroutine leaks, nil pointer dereference, slice off-by-one, `defer` inside loops executing too late.",
+    ".rs":    "Pay special attention to: `unwrap()`/`expect()` on None/Err without handling, integer overflow in debug vs release, off-by-one in index operations, borrow checker workarounds that hide bugs.",
+    ".c":     "Pay special attention to: buffer overflows, null pointer dereference, integer overflow/underflow, use-after-free, missing bounds checks, signed/unsigned comparison.",
+    ".cpp":   "Pay special attention to: same as C plus object slicing, virtual dispatch issues, RAII violations, iterator invalidation.",
+    ".ts":    "Pay special attention to: null/undefined not handled, missing `await` on async calls, type assertions (`as`) bypassing runtime checks, off-by-one in array loops.",
+    ".js":    "Pay special attention to: `==` vs `===`, undefined/null not handled, async errors silently ignored, off-by-one in array loops, `this` binding issues.",
+    ".rb":    "Pay special attention to: nil handling, method_missing pitfalls, mutable object sharing, `rescue Exception` catching too broadly.",
+    ".pl":    "Pay special attention to: undef handling, string vs number context confusion, regex capture group off-by-one, wantarray context bugs.",
+    ".lua":   "Pay special attention to: 1-based indexing errors, nil handling, table mutation during iteration, local vs global variable shadowing.",
+    ".sh":    "Pay special attention to: unquoted variables causing word splitting, missing exit code checks, `pipefail` not set, command injection via unquoted user input.",
+    ".bash":  "Pay special attention to: unquoted variables causing word splitting, missing exit code checks, `pipefail` not set, command injection via unquoted user input.",
+    ".ps1":   "Pay special attention to: unchecked `$?`, null/empty string handling, pipeline errors silently ignored, implicit type coercion.",
+    ".bat":   "Pay special attention to: missing `ERRORLEVEL` checks, variable expansion issues, logic errors in IF/FOR constructs.",
+    ".sql":   "Pay special attention to: UPDATE/DELETE without WHERE clause, NULL comparison using `=` instead of `IS NULL`, missing transaction rollback on error, off-by-one in LIMIT/OFFSET.",
+    ".hcl":   "Pay special attention to: `count` vs `for_each` logic errors, incorrect resource references, missing `depends_on` causing race conditions, incorrect conditional expressions.",
+    ".yar":   "Pay special attention to: condition logic inversions, `any of` vs `all of` semantics, overlapping string definitions, incorrect offset calculations.",
+    ".yara":  "Pay special attention to: condition logic inversions, `any of` vs `all of` semantics, overlapping string definitions, incorrect offset calculations.",
+    ".xsl":   "Pay special attention to: XPath predicate logic errors, missing default templates causing silent data loss, incorrect `select` expressions.",
+    ".xslt":  "Pay special attention to: XPath predicate logic errors, missing default templates causing silent data loss, incorrect `select` expressions.",
+}
+
 SYSTEM_PROMPT = """\
 You are a meticulous code reviewer. You are given the diff of one file from a \
 GitHub pull request. Your only job is to find genuine LOGIC BUGS introduced by \
@@ -198,13 +226,17 @@ def find_bugs_for_file(client: anthropic.AnthropicBedrock, fd: FileDiff) -> File
         patch = patch[:MAX_CHUNK_CHARS]
         print(f"  {fd.filename}: diff truncated to {MAX_CHUNK_CHARS} chars")
 
+    _, ext = os.path.splitext(fd.filename)
+    hint = LANGUAGE_HINTS.get(ext.lower(), "")
+    hint_text = f"\n\nLanguage-specific guidance: {hint}" if hint else ""
+
     diff_text = f"File: {fd.filename}\n\n{patch}"
     response = client.messages.create(
         model=MODEL,
         max_tokens=4096,
         system=SYSTEM_PROMPT,
         output_config={"format": {"type": "json_schema", "schema": OUTPUT_SCHEMA}},
-        messages=[{"role": "user", "content": f"Review this diff for logic bugs:\n\n{diff_text}"}],
+        messages=[{"role": "user", "content": f"Review this diff for logic bugs:{hint_text}\n\n{diff_text}"}],
     )
     if response.stop_reason == "max_tokens":
         print(f"  {fd.filename}: response truncated; findings may be incomplete.")
