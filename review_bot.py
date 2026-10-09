@@ -29,7 +29,7 @@ import anthropic
 from github import Auth, Github
 from github.GithubException import GithubException
 
-MODEL = "us.anthropic.claude-sonnet-4-5-20251101"  # us-west-2 cross-region inference
+MODEL = "us.anthropic.claude-sonnet-4-6"  # us-west-2 cross-region inference
 
 # Max diff characters sent per Claude call. Keeps well inside token limits.
 MAX_CHUNK_CHARS = 12_000
