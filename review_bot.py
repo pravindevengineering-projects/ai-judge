@@ -217,7 +217,6 @@ def post_review(pull, commit_sha: str, inline: list[dict], fallback: list[dict])
                 body=body,
                 event="COMMENT",
                 comments=inline,
-                commit_id=commit_sha,
             )
             print(f"Posted {len(inline)} inline comment(s), {len(fallback)} fallback(s).")
             return
@@ -234,7 +233,6 @@ def post_review(pull, commit_sha: str, inline: list[dict], fallback: list[dict])
                         body=BOT_MARKER,
                         event="COMMENT",
                         comments=[comment],
-                        commit_id=commit_sha,
                     )
                     posted += 1
                 except GithubException:
