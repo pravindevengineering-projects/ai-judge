@@ -1,17 +1,41 @@
-  name: AI PR Review
-  on:
-    pull_request:
+name: AI PR Review
 
-  jobs:
-    ai-review:
-      uses: pravindevengineering-projects/ai-judge/.github/workflows/ai-review.yml@main
-      permissions:
-        contents: read
-        pull-requests: write
-      with:
-        reviewer-repo: pravindevengineering-projects/ai-judge
-      secrets:
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-  EOF
+on:
+  workflow_call:
+    inputs:
+      reviewer-repo:
+        description: "The repo containing review_bot.py, as owner/repo"
+        required: false
+        default: ""
+    secrets:
+      AWS_ACCESS_KEY_ID:
+        required: true
+      AWS_SECRET_ACCESS_KEY:
+        required: true
 
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Check out reviewer
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.reviewer-repo != '' && inputs.reviewer-repo || github.repository }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install requirements
+        run: pip install -r requirements.txt
+
+      - name: Run AI reviewer
+        run: python review_bot.py
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: us-east-1
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
