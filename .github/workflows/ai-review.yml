@@ -24,7 +24,7 @@ jobs:
       - name: Check out reviewer
         uses: actions/checkout@v4
         with:
-          repository: ${{ inputs.reviewer-repo != '' && inputs.reviewer-repo || github.repository }}
+          repository: ${{ inputs.reviewer-repo || github.repository }}
 
       - uses: actions/setup-python@v5
         with:
