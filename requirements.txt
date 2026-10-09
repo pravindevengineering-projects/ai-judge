@@ -1,2 +1,2 @@
 PyGithub>=2.4
-anthropic>=0.69
+anthropic[bedrock]>=0.49
