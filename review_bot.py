@@ -37,6 +37,29 @@ MAX_CHUNK_CHARS = 12_000
 # Files whose diffs are noise for logic-bug review.
 _MINIFIED_RE = re.compile(r"\.min\.(js|css)$", re.IGNORECASE)
 
+# Extensions with no reviewable logic (markup, style, docs, generated, grammars).
+_SKIP_EXTENSIONS = {
+    # Markup / docs
+    ".html", ".htm", ".md", ".rst", ".txt", ".rtf", ".apib",
+    # Style
+    ".css", ".scss", ".sass",
+    # Test specs / templates
+    ".feature",           # Gherkin
+    ".mustache", ".hbs",  # Mustache/Handlebars
+    # Parser grammars
+    ".g4",                # ANTLR
+    ".pegjs",             # PEG.js
+    # Minified (also caught by regex above)
+    ".min.js", ".min.css",
+}
+
+# Filenames (no extension) to skip regardless of path.
+_SKIP_FILENAMES = {
+    "package-lock.json", "yarn.lock", "poetry.lock", "Gemfile.lock",
+    "go.sum", "Pipfile.lock", "composer.lock",
+    "Dockerfile", "Makefile", "gradlew", "gradlew.bat",
+}
+
 BOT_MARKER = "<!-- ai-judge-review -->"
 
 SYSTEM_PROMPT = """\
@@ -99,10 +122,18 @@ class FileDiff:
 
 
 def is_reviewable(filename: str) -> bool:
-    if filename == "package-lock.json" or filename.endswith("/package-lock.json"):
+    basename = filename.split("/")[-1]
+    # Exact filename matches (lockfiles, build tools, etc.)
+    if basename in _SKIP_FILENAMES:
         return False
-    if filename.endswith(".csv"):
+    # Extension matches (markup, style, docs, grammars)
+    _, ext = os.path.splitext(basename)
+    if ext.lower() in _SKIP_EXTENSIONS:
         return False
+    # CSV / TSV data files
+    if ext.lower() in {".csv", ".tsv"}:
+        return False
+    # Minified assets
     if _MINIFIED_RE.search(filename):
         return False
     return True
