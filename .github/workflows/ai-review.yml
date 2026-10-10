@@ -48,12 +48,16 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Commit review log
-        if: ${{ secrets.AI_JUDGE_WRITE_TOKEN != '' }}
         run: |
+          if [ -z "$AI_JUDGE_WRITE_TOKEN" ]; then
+            echo "AI_JUDGE_WRITE_TOKEN not configured; skipping log commit."
+            exit 0
+          fi
           git config user.name "ai-judge[bot]"
           git config user.email "ai-judge[bot]@users.noreply.github.com"
+          git remote set-url origin "https://x-access-token:${AI_JUDGE_WRITE_TOKEN}@github.com/${{ inputs.reviewer-repo || github.repository }}.git"
           git add review_log.csv
           git diff --cached --quiet || git commit -m "chore: log review for ${{ github.repository }}#${{ github.event.pull_request.number }}"
           git push
         env:
-          GH_TOKEN: ${{ secrets.AI_JUDGE_WRITE_TOKEN }}
+          AI_JUDGE_WRITE_TOKEN: ${{ secrets.AI_JUDGE_WRITE_TOKEN }}
