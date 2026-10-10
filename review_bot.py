@@ -19,6 +19,8 @@ GITHUB_REPOSITORY and GITHUB_EVENT_PATH are set automatically.
 
 from __future__ import annotations
 
+import csv
+import datetime
 import json
 import os
 import re
@@ -346,6 +348,32 @@ def post_review(pull, commit_sha: str, inline: list[dict], fallback: list[dict],
         print(f"Posted {len(fallback)} fallback comment(s) (no valid inline lines).")
 
 
+LOG_FILE = "review_log.csv"
+LOG_FIELDS = ["timestamp", "repo", "pr_number", "files_reviewed", "findings", "input_tokens", "output_tokens", "cost_usd"]
+
+
+def append_review_log(repo_name: str, pr_number: int, files_reviewed: int,
+                      findings: int, input_tokens: int, output_tokens: int) -> None:
+    """Append one row to review_log.csv (creates header on first write)."""
+    cost = (input_tokens * 3.00 + output_tokens * 15.00) / 1_000_000
+    write_header = not os.path.exists(LOG_FILE)
+    with open(LOG_FILE, "a", newline="", encoding="utf-8") as fh:
+        writer = csv.DictWriter(fh, fieldnames=LOG_FIELDS)
+        if write_header:
+            writer.writeheader()
+        writer.writerow({
+            "timestamp": datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "repo": repo_name,
+            "pr_number": pr_number,
+            "files_reviewed": files_reviewed,
+            "findings": findings,
+            "input_tokens": input_tokens,
+            "output_tokens": output_tokens,
+            "cost_usd": f"{cost:.4f}",
+        })
+    print(f"Review log updated: {LOG_FILE}")
+
+
 def main() -> int:
     token = os.environ.get("GITHUB_TOKEN")
     if not token:
@@ -396,10 +424,12 @@ def main() -> int:
 
     if not all_findings:
         print("No logic bugs found.")
+        append_review_log(repo_name, pr_number, len(files), 0, total_input, total_output)
         return 0
 
     inline, fallback = validate_comments(all_findings, files)
     post_review(pull, commit_sha, inline, fallback, total_input, total_output)
+    append_review_log(repo_name, pr_number, len(files), len(all_findings), total_input, total_output)
     return 0
 
 
