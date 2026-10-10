@@ -47,7 +47,15 @@ jobs:
           AWS_DEFAULT_REGION: us-west-2
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Commit review log
+      - name: Upload review log artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: review-log
+          path: review_log.csv
+          if-no-files-found: warn
+
+      - name: Commit review log to ai-judge repo
         run: |
           if [ -z "$AI_JUDGE_WRITE_TOKEN" ]; then
             echo "AI_JUDGE_WRITE_TOKEN not configured; skipping log commit."
