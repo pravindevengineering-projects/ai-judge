@@ -36,6 +36,10 @@ MODEL = "us.anthropic.claude-sonnet-4-6"  # us-west-2 cross-region inference
 # Max diff characters sent per Claude call. Keeps well inside token limits.
 MAX_CHUNK_CHARS = 12_000
 
+# Max files reviewed per PR. PRs exceeding this get a warning comment and only
+# the first N files are reviewed, preventing runaway cost on huge PRs.
+MAX_FILES_PER_PR = 20
+
 # Files whose diffs are noise for logic-bug review.
 _MINIFIED_RE = re.compile(r"\.min\.(js|css)$", re.IGNORECASE)
 
@@ -186,10 +190,9 @@ def parse_valid_lines(patch: str) -> set[int]:
     return valid
 
 
-def collect_files(pull) -> list[FileDiff]:
-    """Return FileDiff objects for every reviewable file in the PR."""
+def _make_file_diffs(file_iter) -> list[FileDiff]:
     files: list[FileDiff] = []
-    for f in pull.get_files():
+    for f in file_iter:
         if not is_reviewable(f.filename):
             continue
         if not f.patch:
@@ -202,8 +205,27 @@ def collect_files(pull) -> list[FileDiff]:
     return files
 
 
+def collect_files(pull) -> list[FileDiff]:
+    """Return FileDiff objects for every reviewable file in the PR."""
+    return _make_file_diffs(pull.get_files())
+
+
+def collect_delta_files(repo, base_sha: str, head_sha: str) -> list[FileDiff]:
+    """Return only the files changed since the last bot review (delta review)."""
+    comparison = repo.compare(base_sha, head_sha)
+    return _make_file_diffs(comparison.files)
+
+
+def last_bot_review_sha(pull) -> str | None:
+    """Return the commit SHA of the most recent bot review, or None."""
+    for review in reversed(list(pull.get_reviews())):
+        if review.user.login.endswith("[bot]") and BOT_MARKER in (review.body or ""):
+            return review.commit_id
+    return None
+
+
 def already_reviewed(pull, commit_sha: str) -> bool:
-    """Return True if the bot already posted a review for this commit."""
+    """Return True if the bot already posted a review for this exact commit."""
     for review in pull.get_reviews():
         if (
             review.user.login.endswith("[bot]")
@@ -399,15 +421,39 @@ def main() -> int:
     repo = gh.get_repo(repo_name)
     pull = repo.get_pull(int(pr_number))
 
-    # Deduplication: skip if already reviewed this commit.
+    # Skip automated/bot PRs (Dependabot, Renovate, etc.)
+    if pull.user.login.endswith("[bot]"):
+        print(f"PR opened by bot ({pull.user.login}); skipping.")
+        return 0
+
+    # Deduplication: skip if already reviewed this exact commit.
     if commit_sha and already_reviewed(pull, commit_sha):
         print(f"Already reviewed commit {commit_sha[:7]}; skipping.")
         return 0
 
-    files = collect_files(pull)
+    # Delta review: if a previous bot review exists, only review files
+    # changed since that commit rather than the full PR.
+    prev_sha = last_bot_review_sha(pull)
+    if prev_sha and prev_sha != commit_sha:
+        print(f"Previous review at {prev_sha[:7]}; reviewing delta to {commit_sha[:7]}.")
+        files = collect_delta_files(repo, prev_sha, commit_sha)
+    else:
+        files = collect_files(pull)
+
     if not files:
         print("No reviewable files in this PR; nothing to do.")
         return 0
+
+    # Cost cap: warn and truncate if too many files.
+    if len(files) > MAX_FILES_PER_PR:
+        skipped = len(files) - MAX_FILES_PER_PR
+        pull.create_issue_comment(
+            f"{BOT_MARKER}\n"
+            f"⚠️ This PR touches {len(files)} reviewable files. "
+            f"AI Judge reviewed the first {MAX_FILES_PER_PR} and skipped {skipped} "
+            f"to stay within the cost cap (`MAX_FILES_PER_PR={MAX_FILES_PER_PR}`)."
+        )
+        files = files[:MAX_FILES_PER_PR]
 
     print(f"Reviewing {len(files)} file(s)...")
     client = anthropic.AnthropicBedrock()
