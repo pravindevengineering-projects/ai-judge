@@ -54,6 +54,7 @@ jobs:
           name: review-log
           path: review_log.csv
           if-no-files-found: warn
+          retention-days: 365
 
       - name: Commit review log to ai-judge repo
         run: |
