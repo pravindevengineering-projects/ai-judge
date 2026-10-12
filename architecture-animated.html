@@ -133,13 +133,6 @@ button.primary:hover{background:#6d28d9;}
   <div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
 </div>
 
-<div class="desc-panel">
-  <div class="desc-step-num" id="desc-num">—</div>
-  <div class="desc-text">
-    <h4 id="desc-title">AI Judge Automated PR Reviewer</h4>
-    <p id="desc-body">Press Play or click Next to walk through the review pipeline step by step.</p>
-  </div>
-</div>
 
 <div class="diagram-wrap">
 <div class="diagram" id="diagram">
@@ -576,10 +569,6 @@ function render() {
   drawEdges(step);
 
   // Description
-  document.getElementById('desc-num').textContent = currentStep;
-  document.getElementById('desc-title').textContent = step.title;
-  document.getElementById('desc-body').textContent = step.body;
-
   // Progress
   document.getElementById('progress-fill').style.width = (currentStep / total * 100) + '%';
 
