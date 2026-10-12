@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Judge — Animated Architecture</title>
+<style>
+:root {
+  --bg:#0d1117; --bg2:#161b22; --bg3:#21262d; --border:#30363d;
+  --text:#e6edf3; --muted:#8b949e;
+  --accent:#7c3aed; --accent2:#a78bfa;
+  --green:#3fb950; --yellow:#e3b341; --red:#f85149; --blue:#58a6ff;
+  --c-dev:#1f4068; --c-gh:#0d3321; --c-vm:#2d2a00; --c-aws:#3a0d0d; --c-judge:#1a0d3a;
+  --b-dev:#58a6ff; --b-gh:#3fb950; --b-vm:#e3b341; --b-aws:#f85149; --b-judge:#a78bfa;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;min-height:100vh;overflow-x:hidden;}
+
+/* NAV */
+nav{position:sticky;top:0;z-index:100;background:rgba(13,17,23,.96);backdrop-filter:blur(8px);border-bottom:1px solid var(--border);padding:0 1.5rem;display:flex;align-items:center;justify-content:space-between;height:52px;}
+.logo{font-weight:700;font-size:1rem;color:var(--accent2);}
+.controls{display:flex;gap:.6rem;align-items:center;}
+button{background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:.35rem .9rem;border-radius:6px;font-size:.85rem;cursor:pointer;transition:all .15s;}
+button:hover{border-color:var(--accent2);color:var(--accent2);}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff;}
+button.primary:hover{background:#6d28d9;}
+#step-label{font-size:.82rem;color:var(--muted);min-width:200px;text-align:right;}
+
+/* DIAGRAM WRAPPER */
+.diagram-wrap{padding:1.5rem;overflow-x:auto;}
+.diagram{position:relative;min-width:1200px;}
+
+/* SWIM LANES */
+.lanes{display:grid;grid-template-columns:110px 190px 1fr 160px 180px;gap:0;border:1px solid var(--border);border-radius:10px;overflow:hidden;}
+.lane{border-right:1px solid var(--border);}
+.lane:last-child{border-right:none;}
+.lane-header{padding:.5rem .6rem;font-size:.72rem;font-weight:700;text-align:center;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--border);}
+.lane-body{padding:.75rem .6rem;min-height:620px;position:relative;}
+
+.lane-dev .lane-header{background:rgba(88,166,255,.15);color:var(--b-dev);}
+.lane-dev .lane-body{background:rgba(88,166,255,.04);}
+.lane-gh  .lane-header{background:rgba(63,185,80,.15);color:var(--b-gh);}
+.lane-gh  .lane-body{background:rgba(63,185,80,.04);}
+.lane-vm  .lane-header{background:rgba(227,179,65,.15);color:var(--b-vm);}
+.lane-vm  .lane-body{background:rgba(227,179,65,.04);}
+.lane-aws .lane-header{background:rgba(248,81,73,.15);color:var(--b-aws);}
+.lane-aws .lane-body{background:rgba(248,81,73,.04);}
+.lane-judge .lane-header{background:rgba(167,139,250,.15);color:var(--b-judge);}
+.lane-judge .lane-body{background:rgba(167,139,250,.04);}
+
+/* NODES */
+.node{position:absolute;border-radius:8px;border:1px solid var(--border);background:var(--bg2);padding:.5rem .6rem;font-size:.75rem;text-align:center;line-height:1.4;transition:all .3s;cursor:default;}
+.node .icon{font-size:1.1rem;display:block;margin-bottom:.2rem;}
+.node.active{border-color:var(--accent2);box-shadow:0 0 0 3px rgba(124,58,237,.35),0 0 20px rgba(124,58,237,.25);background:#1e1040;color:#fff;}
+.node.done{border-color:#238636;background:#0d2a14;opacity:.75;}
+.node.decision{border-radius:0;transform:rotate(45deg);padding:.3rem;}
+.node.decision .inner{transform:rotate(-45deg);display:block;}
+
+/* STEP BADGES */
+.step-badge{position:absolute;top:-8px;left:-8px;background:var(--accent);color:#fff;border-radius:50%;width:18px;height:18px;font-size:.65rem;font-weight:700;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .3s;}
+.node.active .step-badge,.node.done .step-badge{opacity:1;}
+.node.done .step-badge{background:#238636;}
+
+/* SVG OVERLAY */
+.svg-overlay{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;overflow:visible;}
+
+/* ANIMATED PACKETS */
+.packet{r:5;fill:var(--accent2);filter:drop-shadow(0 0 4px var(--accent2));opacity:0;}
+
+/* EDGE PATHS */
+.edge{fill:none;stroke:var(--border);stroke-width:1.5;stroke-dasharray:4 4;}
+.edge.active-edge{stroke:var(--accent2);stroke-width:2;animation:dash-flow .8s linear infinite;}
+.edge.done-edge{stroke:#238636;stroke-width:1.5;}
+@keyframes dash-flow{to{stroke-dashoffset:-8;}}
+
+/* DESCRIPTION PANEL */
+.desc-panel{background:var(--bg2);border:1px solid var(--border);border-radius:10px;margin:0 1.5rem 1.5rem;padding:1rem 1.5rem;min-height:72px;display:flex;align-items:center;gap:1rem;}
+.desc-step-num{font-size:2rem;font-weight:800;color:var(--accent);min-width:48px;text-align:center;}
+.desc-text h4{font-size:.95rem;font-weight:600;color:var(--accent2);margin-bottom:.2rem;}
+.desc-text p{font-size:.85rem;color:var(--muted);line-height:1.5;}
+
+/* PROGRESS BAR */
+.progress-wrap{padding:.5rem 1.5rem;}
+.progress-bar{height:3px;background:var(--bg3);border-radius:2px;overflow:hidden;}
+.progress-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:2px;transition:width .4s;}
+
+/* LEGEND */
+.legend{display:flex;gap:1.2rem;flex-wrap:wrap;padding:.75rem 1.5rem 1.5rem;border-top:1px solid var(--border);margin-top:1rem;}
+.leg{display:flex;align-items:center;gap:.4rem;font-size:.78rem;color:var(--muted);}
+.leg-dot{width:10px;height:10px;border-radius:2px;border:1px solid;}
+</style>
+</head>
+<body>
+
+<nav>
+  <span class="logo">⚖️ AI Judge — Architecture Flow</span>
+  <div class="controls">
+    <span id="step-label">Step 0 / 12</span>
+    <button onclick="reset()">↺ Reset</button>
+    <button onclick="prevStep()">‹ Prev</button>
+    <button onclick="nextStep()">Next ›</button>
+    <button class="primary" id="play-btn" onclick="togglePlay()">▶ Play</button>
+  </div>
+</nav>
+
+<div class="progress-wrap">
+  <div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
+</div>
+
+<div class="desc-panel">
+  <div class="desc-step-num" id="desc-num">—</div>
+  <div class="desc-text">
+    <h4 id="desc-title">AI Judge Automated PR Reviewer</h4>
+    <p id="desc-body">Press Play or click Next to walk through the review pipeline step by step.</p>
+  </div>
+</div>
+
+<div class="diagram-wrap">
+<div class="diagram" id="diagram">
+
+<div class="lanes">
+
+  <!-- DEVELOPER -->
+  <div class="lane lane-dev">
+    <div class="lane-header">Developer</div>
+    <div class="lane-body">
+      <div class="node" id="n-dev" style="top:40px;left:10px;right:10px;">
+        <div class="step-badge">1</div>
+        <span class="icon">👩‍💻</span>
+        Open Pull Request
+      </div>
+    </div>
+  </div>
+
+  <!-- GITHUB TARGET REPO -->
+  <div class="lane lane-gh">
+    <div class="lane-header">GitHub — Target Repo</div>
+    <div class="lane-body">
+      <div class="node" id="n-event" style="top:40px;left:10px;right:10px;">
+        <div class="step-badge">2</div>
+        <span class="icon">⚡</span>
+        pull_request event<br>
+        <span style="color:var(--muted);font-size:.7rem;">opened / synchronize</span>
+      </div>
+      <div class="node" id="n-caller" style="top:160px;left:10px;right:10px;">
+        <div class="step-badge">3</div>
+        <span class="icon">📄</span>
+        Caller Workflow<br>
+        <span style="color:var(--muted);font-size:.68rem;">15-line ai-review.yml</span>
+      </div>
+      <div class="node" id="n-comments" style="top:500px;left:10px;right:10px;">
+        <div class="step-badge">12</div>
+        <span class="icon">✅</span>
+        Inline Comments<br>+ Suggestion blocks<br>+ Token usage
+      </div>
+    </div>
+  </div>
+
+  <!-- GITHUB ACTIONS VM -->
+  <div class="lane lane-vm">
+    <div class="lane-header">GitHub Actions — Ubuntu VM</div>
+    <div class="lane-body" style="padding:.75rem .4rem;">
+      <div class="node" id="n-checkout" style="top:40px;left:8px;width:180px;">
+        <div class="step-badge">4</div>
+        <span class="icon">📦</span>
+        checkout ai-judge repo
+      </div>
+      <div class="node" id="n-pip" style="top:40px;left:200px;width:180px;">
+        <div class="step-badge">5</div>
+        <span class="icon">🐍</span>
+        pip install<br>PyGithub · anthropic[bedrock]
+      </div>
+
+      <!-- review_bot.py box -->
+      <div style="position:absolute;top:130px;left:8px;right:8px;bottom:130px;border:1px dashed var(--accent);border-radius:8px;background:rgba(124,58,237,.04);">
+        <div style="position:absolute;top:-10px;left:12px;background:var(--bg);padding:0 .4rem;font-size:.72rem;color:var(--accent2);font-weight:700;">review_bot.py</div>
+
+        <div class="node" id="n-botskip" style="top:18px;left:10px;width:150px;border-color:#f85149;">
+          <div class="step-badge">6</div>
+          <span class="icon">🤖</span>
+          Skip bot PRs?<br><span style="color:var(--muted);font-size:.68rem;">Dependabot, Renovate…</span>
+        </div>
+        <div class="node" id="n-dedup" style="top:18px;left:172px;width:150px;">
+          <div class="step-badge">7</div>
+          <span class="icon">♻️</span>
+          Already reviewed<br>this commit SHA?
+        </div>
+        <div class="node" id="n-diff" style="top:130px;left:10px;width:150px;">
+          <div class="step-badge">8</div>
+          <span class="icon">📂</span>
+          Fetch diff<br>Delta since last review
+        </div>
+        <div class="node" id="n-filter" style="top:130px;left:172px;width:150px;">
+          <div class="step-badge">9</div>
+          <span class="icon">🔍</span>
+          Filter files<br>Skip 40+ ext · cap 20
+        </div>
+        <div class="node" id="n-hints" style="top:245px;left:10px;width:150px;">
+          <div class="step-badge">10</div>
+          <span class="icon">💡</span>
+          Inject language hints<br><span style="color:var(--muted);font-size:.68rem;">23 ext → Claude prompt</span>
+        </div>
+        <div class="node" id="n-validate" style="top:245px;left:172px;width:150px;">
+          <div class="step-badge">11</div>
+          <span class="icon">✔️</span>
+          Validate line numbers<br>422 fallback
+        </div>
+      </div>
+
+      <div class="node" id="n-log" style="bottom:60px;left:8px;width:180px;">
+        <div class="step-badge">12</div>
+        <span class="icon">📋</span>
+        Append review_log.csv<br>Upload artifact (365d)
+      </div>
+      <div class="node" id="n-commit" style="bottom:60px;left:200px;width:180px;">
+        <span class="icon">⬆️</span>
+        Commit log → ai-judge<br><span style="color:var(--muted);font-size:.68rem;">if AI_JUDGE_WRITE_TOKEN set</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- AWS -->
+  <div class="lane lane-aws">
+    <div class="lane-header">AWS Bedrock</div>
+    <div class="lane-body">
+      <div class="node" id="n-bedrock" style="top:290px;left:8px;right:8px;">
+        <div class="step-badge">10</div>
+        <span class="icon">☁️</span>
+        Claude Sonnet 4.6<br>
+        <span style="color:var(--muted);font-size:.68rem;">us.anthropic.claude-sonnet-4-6<br>us-west-2<br>JSON schema output</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- AI-JUDGE REPO -->
+  <div class="lane lane-judge">
+    <div class="lane-header">ai-judge repo</div>
+    <div class="lane-body">
+      <div class="node" id="n-aijudge" style="top:40px;left:8px;right:8px;">
+        <div class="step-badge">4</div>
+        <span class="icon">📁</span>
+        review_bot.py<br>requirements.txt<br>ai-review.yml<br>
+        <span style="color:var(--muted);font-size:.68rem;">(reusable workflow)</span>
+      </div>
+      <div class="node" id="n-csvstore" style="top:490px;left:8px;right:8px;">
+        <span class="icon">🗂️</span>
+        review_log.csv<br>
+        <span style="color:var(--muted);font-size:.68rem;">All repos · cumulative</span>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /lanes -->
+
+<!-- SVG OVERLAY FOR ARROWS -->
+<svg class="svg-overlay" id="svg-overlay"></svg>
+
+</div><!-- /diagram -->
+</div><!-- /diagram-wrap -->
+
+<div class="legend">
+  <div class="leg"><div class="leg-dot" style="background:rgba(88,166,255,.2);border-color:#58a6ff;"></div>Developer action</div>
+  <div class="leg"><div class="leg-dot" style="background:rgba(63,185,80,.2);border-color:#3fb950;"></div>GitHub / Actions trigger</div>
+  <div class="leg"><div class="leg-dot" style="background:rgba(227,179,65,.2);border-color:#e3b341;"></div>review_bot.py logic</div>
+  <div class="leg"><div class="leg-dot" style="background:rgba(248,81,73,.2);border-color:#f85149;"></div>AWS Bedrock / Claude</div>
+  <div class="leg"><div class="leg-dot" style="background:rgba(167,139,250,.2);border-color:#a78bfa;"></div>ai-judge repo storage</div>
+  <div class="leg"><div class="leg-dot" style="background:rgba(124,58,237,.3);border-color:#7c3aed;border-style:dashed;"></div>Animated data flow</div>
+</div>
+
+<script>
+const STEPS = [
+  {
+    nodes: [],
+    edges: [],
+    title: "AI Judge — Overview",
+    body: "An automated PR reviewer that catches logic bugs before they reach production. Press Next or Play to walk through the flow."
+  },
+  {
+    nodes: ["n-dev"],
+    edges: [],
+    title: "Step 1 — Developer Opens a PR",
+    body: "A developer opens or updates a pull request in any target repo (e.g. test-target). This fires the pull_request event."
+  },
+  {
+    nodes: ["n-dev","n-event"],
+    edges: [["n-dev","n-event"]],
+    title: "Step 2 — GitHub fires pull_request event",
+    body: "GitHub detects the PR action (opened / synchronize) and kicks off all registered workflows for that repo."
+  },
+  {
+    nodes: ["n-dev","n-event","n-caller"],
+    edges: [["n-dev","n-event"],["n-event","n-caller"]],
+    title: "Step 3 — Caller Workflow triggers",
+    body: "A 15-line ai-review.yml in the target repo fires. It delegates all work to the reusable workflow in ai-judge via 'uses:'."
+  },
+  {
+    nodes: ["n-dev","n-event","n-caller","n-aijudge","n-checkout"],
+    edges: [["n-caller","n-aijudge"],["n-aijudge","n-checkout"]],
+    title: "Step 4 — GitHub Actions checks out ai-judge repo",
+    body: "GitHub spins up a fresh Ubuntu VM. actions/checkout@v4 clones the ai-judge repo (where review_bot.py lives) into the workspace."
+  },
+  {
+    nodes: ["n-checkout","n-pip"],
+    edges: [["n-checkout","n-pip"]],
+    title: "Step 5 — Install dependencies",
+    body: "pip installs PyGithub (GitHub API) and anthropic[bedrock] (AWS Bedrock client). Takes ~20 seconds on a cold runner."
+  },
+  {
+    nodes: ["n-pip","n-botskip"],
+    edges: [["n-pip","n-botskip"]],
+    title: "Step 6 — Skip bot PRs",
+    body: "review_bot.py checks pull.user.login. If it ends with [bot] (Dependabot, Renovate, etc.) the script exits immediately — zero Claude API calls made."
+  },
+  {
+    nodes: ["n-botskip","n-dedup"],
+    edges: [["n-botskip","n-dedup"]],
+    title: "Step 7 — Deduplication check",
+    body: "Looks at existing reviews for this PR. If the bot already posted a review for this exact commit SHA, it exits — no duplicate reviews on re-runs."
+  },
+  {
+    nodes: ["n-dedup","n-diff"],
+    edges: [["n-dedup","n-diff"]],
+    title: "Step 8 — Fetch diff (delta review)",
+    body: "PyGithub fetches the PR diff. If a previous bot review exists, repo.compare(prev_sha, head_sha) fetches only files changed since the last review — not the full PR again."
+  },
+  {
+    nodes: ["n-diff","n-filter"],
+    edges: [["n-diff","n-filter"]],
+    title: "Step 9 — Filter & cap files",
+    body: "Skips 40+ extension/filename types (markup, lockfiles, CSVs, minified assets). Cost cap: reviews at most 20 files; posts a warning comment if truncated."
+  },
+  {
+    nodes: ["n-filter","n-hints","n-bedrock"],
+    edges: [["n-filter","n-hints"],["n-hints","n-bedrock"],["n-bedrock","n-validate"]],
+    title: "Step 10 — Language hints → Claude via AWS Bedrock",
+    body: "For each file, a language-specific hint (23 extensions: Python off-by-one, Go ignored errors, Shell unquoted vars…) is injected into the prompt. Claude Sonnet 4.6 returns structured JSON findings."
+  },
+  {
+    nodes: ["n-validate","n-comments"],
+    edges: [["n-validate","n-comments"]],
+    title: "Step 11 — Validate lines & post review",
+    body: "Line numbers are validated against the actual diff. Valid findings become inline GitHub suggestion blocks. Invalid lines fall back to PR-level comments so nothing is lost. 422 errors trigger per-comment retry."
+  },
+  {
+    nodes: ["n-log","n-commit","n-csvstore","n-comments"],
+    edges: [["n-comments","n-log"],["n-log","n-commit"],["n-commit","n-csvstore"]],
+    title: "Step 12 — Log & commit",
+    body: "review_log.csv is appended with timestamp, repo, PR number, files reviewed, findings count, tokens, and cost. Uploaded as an Actions artifact (365-day retention). If AI_JUDGE_WRITE_TOKEN is set, committed back to ai-judge for cumulative cross-repo stats."
+  }
+];
+
+let currentStep = 0;
+let playing = false;
+let playTimer = null;
+
+function getCenter(el, container) {
+  const er = el.getBoundingClientRect();
+  const cr = container.getBoundingClientRect();
+  return {
+    x: er.left - cr.left + er.width / 2,
+    y: er.top - cr.top + er.height / 2
+  };
+}
+
+function drawEdges(step) {
+  const svg = document.getElementById('svg-overlay');
+  const container = document.getElementById('diagram');
+  svg.innerHTML = '';
+
+  if (!step.edges) return;
+
+  step.edges.forEach(([fromId, toId], i) => {
+    const from = document.getElementById(fromId);
+    const to = document.getElementById(toId);
+    if (!from || !to) return;
+
+    const a = getCenter(from, container);
+    const b = getCenter(to, container);
+
+    // Control points for curved path
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const cx1 = a.x + dx * 0.5;
+    const cy1 = a.y;
+    const cx2 = a.x + dx * 0.5;
+    const cy2 = b.y;
+
+    const path = document.createElementNS('http://www.w3.org/2000/svg','path');
+    const d = `M ${a.x} ${a.y} C ${cx1} ${cy1}, ${cx2} ${cy2}, ${b.x} ${b.y}`;
+    path.setAttribute('d', d);
+    path.setAttribute('fill', 'none');
+    path.setAttribute('stroke', '#a78bfa');
+    path.setAttribute('stroke-width', '2');
+    path.setAttribute('stroke-dasharray', '6 4');
+    path.setAttribute('marker-end', 'url(#arrow)');
+    path.style.animation = 'dash-flow .7s linear infinite';
+    svg.appendChild(path);
+
+    // Animated packet dot
+    const circle = document.createElementNS('http://www.w3.org/2000/svg','circle');
+    circle.setAttribute('r', '5');
+    circle.setAttribute('fill', '#a78bfa');
+    circle.style.filter = 'drop-shadow(0 0 4px #a78bfa)';
+
+    const anim = document.createElementNS('http://www.w3.org/2000/svg','animateMotion');
+    anim.setAttribute('dur', '1.4s');
+    anim.setAttribute('repeatCount', 'indefinite');
+    anim.setAttribute('begin', `${i * 0.4}s`);
+
+    const mp = document.createElementNS('http://www.w3.org/2000/svg','mpath');
+    path.setAttribute('id', `path-${i}`);
+    mp.setAttribute('href', `#path-${i}`);
+    anim.appendChild(mp);
+    circle.appendChild(anim);
+    svg.appendChild(circle);
+  });
+
+  // Arrow marker
+  const defs = document.createElementNS('http://www.w3.org/2000/svg','defs');
+  const marker = document.createElementNS('http://www.w3.org/2000/svg','marker');
+  marker.setAttribute('id','arrow');
+  marker.setAttribute('viewBox','0 0 10 10');
+  marker.setAttribute('refX','9');
+  marker.setAttribute('refY','5');
+  marker.setAttribute('markerWidth','6');
+  marker.setAttribute('markerHeight','6');
+  marker.setAttribute('orient','auto-start-reverse');
+  const poly = document.createElementNS('http://www.w3.org/2000/svg','path');
+  poly.setAttribute('d','M 0 0 L 10 5 L 0 10 z');
+  poly.setAttribute('fill','#a78bfa');
+  marker.appendChild(poly);
+  defs.appendChild(marker);
+  svg.insertBefore(defs, svg.firstChild);
+}
+
+function render() {
+  const step = STEPS[currentStep];
+  const total = STEPS.length - 1;
+
+  // Reset all nodes
+  document.querySelectorAll('.node').forEach(n => {
+    n.classList.remove('active','done');
+  });
+
+  // Mark done nodes (all nodes from prev steps)
+  const doneNodes = new Set();
+  for (let i = 1; i < currentStep; i++) {
+    (STEPS[i].nodes || []).forEach(id => doneNodes.add(id));
+  }
+  // Mark active
+  const activeNodes = new Set(step.nodes || []);
+  // done = was active before but not in current active
+  doneNodes.forEach(id => {
+    if (!activeNodes.has(id)) {
+      const el = document.getElementById(id);
+      if (el) el.classList.add('done');
+    }
+  });
+  activeNodes.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.add('active');
+  });
+
+  // Draw edges
+  drawEdges(step);
+
+  // Description
+  document.getElementById('desc-num').textContent = currentStep === 0 ? '—' : currentStep;
+  document.getElementById('desc-title').textContent = step.title;
+  document.getElementById('desc-body').textContent = step.body;
+
+  // Progress
+  document.getElementById('progress-fill').style.width = (currentStep / total * 100) + '%';
+
+  // Step label
+  document.getElementById('step-label').textContent = `Step ${currentStep} / ${total}`;
+}
+
+function nextStep() {
+  if (currentStep < STEPS.length - 1) {
+    currentStep++;
+    render();
+  } else {
+    stopPlay();
+  }
+}
+
+function prevStep() {
+  if (currentStep > 0) {
+    currentStep--;
+    render();
+  }
+}
+
+function reset() {
+  stopPlay();
+  currentStep = 0;
+  render();
+}
+
+function togglePlay() {
+  if (playing) stopPlay();
+  else startPlay();
+}
+
+function startPlay() {
+  playing = true;
+  document.getElementById('play-btn').textContent = '⏸ Pause';
+  playTimer = setInterval(() => {
+    if (currentStep < STEPS.length - 1) nextStep();
+    else stopPlay();
+  }, 2200);
+}
+
+function stopPlay() {
+  playing = false;
+  clearInterval(playTimer);
+  document.getElementById('play-btn').textContent = '▶ Play';
+}
+
+// Re-draw edges on resize
+window.addEventListener('resize', () => { if (currentStep > 0) drawEdges(STEPS[currentStep]); });
+
+// Init
+render();
+</script>
+</body>
+</html>
