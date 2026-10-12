@@ -1,0 +1,254 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxGraphModel dx="1422" dy="762" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1654" pageHeight="1169" math="0" shadow="0">
+  <root>
+    <mxCell id="0" />
+    <mxCell id="1" parent="0" />
+
+    <!-- ───── TITLE ───── -->
+    <mxCell id="title" value="AI Judge — Automated PR Reviewer" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=20;fontStyle=1;fontColor=#1a1a2e;" vertex="1" parent="1">
+      <mxGeometry x="477" y="20" width="700" height="40" as="geometry" />
+    </mxCell>
+
+    <!-- ───── SWIM LANES ───── -->
+    <!-- Lane: Developer -->
+    <mxCell id="lane-dev" value="Developer" style="swimlane;startSize=30;horizontal=0;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=12;" vertex="1" parent="1">
+      <mxGeometry x="40" y="80" width="120" height="160" as="geometry" />
+    </mxCell>
+    <!-- Lane: GitHub (target repo) -->
+    <mxCell id="lane-gh" value="GitHub (target repo)" style="swimlane;startSize=30;horizontal=0;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;fontSize=12;" vertex="1" parent="1">
+      <mxGeometry x="180" y="80" width="200" height="580" as="geometry" />
+    </mxCell>
+    <!-- Lane: GitHub Actions VM -->
+    <mxCell id="lane-vm" value="GitHub Actions — Ubuntu VM" style="swimlane;startSize=30;horizontal=0;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=1;fontSize=12;" vertex="1" parent="1">
+      <mxGeometry x="400" y="80" width="700" height="580" as="geometry" />
+    </mxCell>
+    <!-- Lane: AWS -->
+    <mxCell id="lane-aws" value="AWS (us-west-2)" style="swimlane;startSize=30;horizontal=0;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1;fontSize=12;" vertex="1" parent="1">
+      <mxGeometry x="1120" y="80" width="200" height="580" as="geometry" />
+    </mxCell>
+    <!-- Lane: ai-judge repo -->
+    <mxCell id="lane-aijudge" value="ai-judge repo (GitHub)" style="swimlane;startSize=30;horizontal=0;fillColor=#e1d5e7;strokeColor=#9673a6;fontStyle=1;fontSize=12;" vertex="1" parent="1">
+      <mxGeometry x="1340" y="80" width="200" height="580" as="geometry" />
+    </mxCell>
+
+    <!-- ───── NODES ───── -->
+
+    <!-- Developer: Open PR -->
+    <mxCell id="dev-pr" value="Open Pull Request" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="55" y="170" width="90" height="40" as="geometry" />
+    </mxCell>
+
+    <!-- GitHub: pull_request event -->
+    <mxCell id="gh-event" value="pull_request event&#xa;(opened / synchronize)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+      <mxGeometry x="200" y="170" width="160" height="40" as="geometry" />
+    </mxCell>
+
+    <!-- GitHub: caller workflow -->
+    <mxCell id="gh-caller" value="Caller Workflow&#xa;test-target/.github/&#xa;workflows/ai-review.yml&#xa;(15 lines)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+      <mxGeometry x="200" y="270" width="160" height="60" as="geometry" />
+    </mxCell>
+
+    <!-- GitHub: PR comments (output) -->
+    <mxCell id="gh-comments" value="✅ Inline Review Comments&#xa;+ Suggestion blocks&#xa;+ Token usage footer" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="200" y="570" width="160" height="60" as="geometry" />
+    </mxCell>
+
+    <!-- VM: Checkout ai-judge -->
+    <mxCell id="vm-checkout" value="actions/checkout@v4&#xa;(checks out ai-judge repo)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+      <mxGeometry x="420" y="170" width="180" height="40" as="geometry" />
+    </mxCell>
+
+    <!-- VM: pip install -->
+    <mxCell id="vm-pip" value="pip install&#xa;PyGithub + anthropic[bedrock]" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+      <mxGeometry x="420" y="240" width="180" height="40" as="geometry" />
+    </mxCell>
+
+    <!-- VM: review_bot.py group -->
+    <mxCell id="vm-bot-group" value="review_bot.py" style="swimlane;startSize=25;fillColor=#ffe6cc;strokeColor=#d79b00;fontStyle=1;fontSize=11;" vertex="1" parent="1">
+      <mxGeometry x="420" y="300" width="640" height="310" as="geometry" />
+    </mxCell>
+
+    <!-- Bot: skip bot PR -->
+    <mxCell id="bot-skipbot" value="1. Skip bot PRs&#xa;(Dependabot, Renovate…)" style="rhombus;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=10;" vertex="1" parent="vm-bot-group">
+      <mxGeometry x="20" y="35" width="140" height="60" as="geometry" />
+    </mxCell>
+
+    <!-- Bot: dedup check -->
+    <mxCell id="bot-dedup" value="2. Already reviewed&#xa;this commit SHA?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=10;" vertex="1" parent="vm-bot-group">
+      <mxGeometry x="20" y="115" width="140" height="60" as="geometry" />
+    </mxCell>
+
+    <!-- Bot: fetch diff -->
+    <mxCell id="bot-diff" value="3. Fetch PR diff&#xa;PyGithub get_files()&#xa;Delta if prev review exists" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=10;" vertex="1" parent="vm-bot-group">
+      <mxGeometry x="200" y="35" width="160" height="55" as="geometry" />
+    </mxCell>
+
+    <!-- Bot: filter -->
+    <mxCell id="bot-filter" value="4. Filter files&#xa;Skip 40+ ext/filenames&#xa;Cost cap: max 20 files" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=10;" vertex="1" parent="vm-bot-group">
+      <mxGeometry x="200" y="115" width="160" height="55" as="geometry" />
+    </mxCell>
+
+    <!-- Bot: per-file loop -->
+    <mxCell id="bot-loop" value="5. Per-file Claude call&#xa;+ language hint injection&#xa;(12K char chunk limit)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=10;" vertex="1" parent="vm-bot-group">
+      <mxGeometry x="200" y="200" width="160" height="55" as="geometry" />
+    </mxCell>
+
+    <!-- Bot: validate + post -->
+    <mxCell id="bot-post" value="6. Validate line numbers&#xa;Post inline review&#xa;422 fallback per-comment" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=10;" vertex="1" parent="vm-bot-group">
+      <mxGeometry x="400" y="115" width="160" height="55" as="geometry" />
+    </mxCell>
+
+    <!-- Bot: log -->
+    <mxCell id="bot-log" value="7. Append row to&#xa;review_log.csv" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=10;" vertex="1" parent="vm-bot-group">
+      <mxGeometry x="400" y="200" width="160" height="55" as="geometry" />
+    </mxCell>
+
+    <!-- VM: upload artifact -->
+    <mxCell id="vm-artifact" value="Upload review_log.csv&#xa;as Actions Artifact&#xa;(365-day retention)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+      <mxGeometry x="420" y="630" width="180" height="50" as="geometry" />
+    </mxCell>
+
+    <!-- VM: commit log -->
+    <mxCell id="vm-commit" value="Commit review_log.csv&#xa;→ ai-judge repo&#xa;(if AI_JUDGE_WRITE_TOKEN set)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+      <mxGeometry x="630" y="630" width="180" height="50" as="geometry" />
+    </mxCell>
+
+    <!-- AWS: Bedrock -->
+    <mxCell id="aws-bedrock" value="AWS Bedrock&#xa;Claude Sonnet 4.6&#xa;us.anthropic.claude-sonnet-4-6&#xa;Structured JSON output" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="1140" y="370" width="160" height="70" as="geometry" />
+    </mxCell>
+
+    <!-- ai-judge repo contents -->
+    <mxCell id="aijudge-contents" value="review_bot.py&#xa;requirements.txt&#xa;.github/workflows/&#xa;  ai-review.yml&#xa;review_log.csv&#xa;architecture.html" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+      <mxGeometry x="1360" y="200" width="160" height="110" as="geometry" />
+    </mxCell>
+
+    <!-- ai-judge: reusable workflow -->
+    <mxCell id="aijudge-workflow" value="Reusable Workflow&#xa;workflow_call trigger&#xa;Secrets: AWS creds +&#xa;AI_JUDGE_WRITE_TOKEN" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+      <mxGeometry x="1360" y="340" width="160" height="70" as="geometry" />
+    </mxCell>
+
+    <!-- ai-judge: cumulative log -->
+    <mxCell id="aijudge-log" value="review_log.csv&#xa;(cumulative — all repos)" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="1370" y="580" width="140" height="60" as="geometry" />
+    </mxCell>
+
+    <!-- ───── EDGES ───── -->
+
+    <!-- Dev → gh event -->
+    <mxCell id="e1" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="dev-pr" target="gh-event" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- gh event → caller -->
+    <mxCell id="e2" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="gh-event" target="gh-caller" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- caller → aijudge reusable workflow -->
+    <mxCell id="e3" value="uses: ai-judge/.github/&#xa;workflows/ai-review.yml@main" style="edgeStyle=orthogonalEdgeStyle;dashed=1;strokeColor=#9673a6;fontColor=#9673a6;fontSize=9;" edge="1" source="gh-caller" target="aijudge-workflow" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- aijudge workflow → VM checkout -->
+    <mxCell id="e4" value="triggers" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#d6b656;" edge="1" source="aijudge-workflow" target="vm-checkout" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- checkout → pip -->
+    <mxCell id="e5" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="vm-checkout" target="vm-pip" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- pip → review_bot group -->
+    <mxCell id="e6" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="vm-pip" target="vm-bot-group" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- skip bot → exit (label) -->
+    <mxCell id="e7" value="is bot? → exit" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#b85450;fontColor=#b85450;fontSize=9;" edge="1" source="bot-skipbot" target="bot-dedup" parent="vm-bot-group">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- dedup → diff -->
+    <mxCell id="e8" value="new commit" style="edgeStyle=orthogonalEdgeStyle;fontSize=9;" edge="1" source="bot-dedup" target="bot-diff" parent="vm-bot-group">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- diff → filter -->
+    <mxCell id="e9" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="bot-diff" target="bot-filter" parent="vm-bot-group">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- filter → loop -->
+    <mxCell id="e10" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="bot-filter" target="bot-loop" parent="vm-bot-group">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- loop → post -->
+    <mxCell id="e11" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="bot-loop" target="bot-post" parent="vm-bot-group">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- post → log -->
+    <mxCell id="e12" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="bot-post" target="bot-log" parent="vm-bot-group">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- loop ↔ Bedrock (crosses lane) -->
+    <mxCell id="e13" value="messages.create()&#xa;JSON schema output" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#b85450;fontColor=#b85450;fontSize=9;" edge="1" source="bot-loop" target="aws-bedrock" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- Bedrock → loop (response) -->
+    <mxCell id="e14" value="findings JSON" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#b85450;fontColor=#b85450;fontSize=9;dashed=1;" edge="1" source="aws-bedrock" target="bot-post" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- bot post → gh comments -->
+    <mxCell id="e15" value="create_review()" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#82b366;fontColor=#82b366;fontSize=9;" edge="1" source="bot-post" target="gh-comments" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- bot group → artifact -->
+    <mxCell id="e16" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="vm-bot-group" target="vm-artifact" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- bot group → commit -->
+    <mxCell id="e17" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="vm-bot-group" target="vm-commit" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- commit → aijudge log -->
+    <mxCell id="e18" value="git push (PAT)" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#9673a6;fontColor=#9673a6;fontSize=9;" edge="1" source="vm-commit" target="aijudge-log" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- checkout pulls from aijudge contents -->
+    <mxCell id="e19" value="git checkout" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#9673a6;fontColor=#9673a6;fontSize=9;dashed=1;" edge="1" source="aijudge-contents" target="vm-checkout" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- ───── LEGEND ───── -->
+    <mxCell id="legend-title" value="Legend" style="text;html=1;strokeColor=none;fillColor=none;fontStyle=1;fontSize=11;" vertex="1" parent="1">
+      <mxGeometry x="40" y="690" width="80" height="20" as="geometry" />
+    </mxCell>
+    <mxCell id="leg1" value="Developer action" style="rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="40" y="715" width="130" height="25" as="geometry" />
+    </mxCell>
+    <mxCell id="leg2" value="GitHub / Actions trigger" style="rounded=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="185" y="715" width="150" height="25" as="geometry" />
+    </mxCell>
+    <mxCell id="leg3" value="review_bot.py logic" style="rounded=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="350" y="715" width="140" height="25" as="geometry" />
+    </mxCell>
+    <mxCell id="leg4" value="AWS Bedrock / Claude" style="rounded=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="505" y="715" width="140" height="25" as="geometry" />
+    </mxCell>
+    <mxCell id="leg5" value="ai-judge repo storage" style="rounded=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="660" y="715" width="140" height="25" as="geometry" />
+    </mxCell>
+
+  </root>
+</mxGraphModel>
