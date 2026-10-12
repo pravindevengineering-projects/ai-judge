@@ -387,12 +387,6 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal()
 <script>
 const STEPS = [
   {
-    nodes: [],
-    edges: [],
-    title: "AI Judge — Overview",
-    body: "An automated PR reviewer that catches logic bugs before they reach production. Press Next or Play to walk through the flow."
-  },
-  {
     nodes: ["n-dev"],
     edges: [],
     title: "Step 1 — Developer Opens a PR",
@@ -582,7 +576,7 @@ function render() {
   drawEdges(step);
 
   // Description
-  document.getElementById('desc-num').textContent = currentStep === 0 ? '—' : currentStep;
+  document.getElementById('desc-num').textContent = currentStep;
   document.getElementById('desc-title').textContent = step.title;
   document.getElementById('desc-body').textContent = step.body;
 
