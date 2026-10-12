@@ -219,7 +219,7 @@ button.primary:hover{background:#6d28d9;}
           <span class="icon">💡</span>
           Inject language hints<br><span style="color:var(--muted);font-size:.68rem;">23 ext → Claude prompt</span>
         </div>
-        <div class="node" id="n-validate" style="top:245px;left:172px;width:150px;">
+        <div class="node clickable" id="n-validate" style="top:245px;left:172px;width:150px;" onclick="openModal('validate')">
           <div class="step-badge">11</div>
           <span class="icon">✔️</span>
           Validate line numbers<br>422 fallback
@@ -323,6 +323,25 @@ const MODAL_CONTENT = {
       </div>
       <div class="section-title">Cost Cap</div>
       <p>Even after filtering, if more than <strong style="color:var(--accent2)">20 files</strong> remain, only the first 20 are reviewed. A warning comment is posted on the PR listing how many were skipped.</p>
+    `
+  },
+  validate: {
+    title: "✔️ Validate Line Numbers & 422 Fallback",
+    html: `
+      <p>Claude returns findings with a file path and line number. But GitHub only allows inline comments on lines that <strong style="color:var(--accent2)">actually appear in the diff</strong> (added/modified lines on the RIGHT side). Any other line number causes GitHub to return a <strong style="color:#f85149">422 error</strong> and reject the review.</p>
+
+      <div class="section-title">Why Claude gets it wrong sometimes</div>
+      <p>Claude may reference a line that exists in the file but wasn't changed in this PR, a line that's off by one, a line from the old version of the file, or a line that doesn't exist at all.</p>
+
+      <div class="section-title">The validation check</div>
+      <p>Before posting anything, the diff is parsed to build an exact set of valid line numbers from the hunk headers (<code>@@ -old +new @@</code>). Every finding is then checked against this set:</p>
+      <div class="tag-grid">
+        <span class="tag" style="border-color:#3fb950;color:#3fb950;background:#0d2a14;">✅ Line in diff → inline comment</span>
+        <span class="tag skip">❌ Line not in diff → fallback comment</span>
+      </div>
+
+      <div class="section-title">422 Fallback — nothing is silently lost</div>
+      <p>Invalid findings are demoted to <strong style="color:var(--accent2)">PR-level comments</strong> (posted in the PR conversation, not anchored to a line). If even the bulk review POST is rejected with 422, each comment is retried <strong style="color:var(--accent2)">one by one</strong> — a single bad comment can't kill all the valid ones.</p>
     `
   },
   hints: {
