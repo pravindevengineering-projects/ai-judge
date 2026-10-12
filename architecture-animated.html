@@ -88,6 +88,32 @@ button.primary:hover{background:#6d28d9;}
 .legend{display:flex;gap:1.2rem;flex-wrap:wrap;padding:.75rem 1.5rem 1.5rem;border-top:1px solid var(--border);margin-top:1rem;}
 .leg{display:flex;align-items:center;gap:.4rem;font-size:.78rem;color:var(--muted);}
 .leg-dot{width:10px;height:10px;border-radius:2px;border:1px solid;}
+
+/* CLICKABLE NODE HINT */
+.node.clickable{cursor:pointer;}
+.node.clickable::after{content:'ℹ';position:absolute;top:3px;right:5px;font-size:.65rem;color:var(--accent2);opacity:.7;}
+.node.clickable:hover::after{opacity:1;}
+
+/* MODAL */
+.modal-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;align-items:center;justify-content:center;backdrop-filter:blur(3px);}
+.modal-backdrop.open{display:flex;}
+.modal{background:var(--bg2);border:1px solid var(--accent);border-radius:12px;max-width:680px;width:90%;max-height:80vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 0 40px rgba(124,58,237,.3);}
+.modal-header{padding:1rem 1.2rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.modal-header h3{color:var(--accent2);font-size:1rem;}
+.modal-close{background:none;border:none;color:var(--muted);font-size:1.3rem;cursor:pointer;padding:.2rem .4rem;border-radius:4px;}
+.modal-close:hover{color:var(--text);background:var(--bg3);}
+.modal-body{padding:1.2rem;overflow-y:auto;}
+.modal-body p{color:var(--muted);font-size:.85rem;margin-bottom:1rem;line-height:1.6;}
+.tag-grid{display:flex;flex-wrap:wrap;gap:.4rem;margin-bottom:1rem;}
+.tag{display:inline-block;background:var(--bg3);border:1px solid var(--border);border-radius:4px;padding:.2rem .55rem;font-size:.78rem;font-family:'SF Mono','Fira Code',monospace;color:var(--accent2);}
+.tag.skip{border-color:#b85450;color:#f85149;background:#1a0505;}
+.lang-table{width:100%;border-collapse:collapse;font-size:.8rem;}
+.lang-table th{text-align:left;color:var(--muted);padding:.4rem .6rem;border-bottom:1px solid var(--border);font-weight:600;}
+.lang-table td{padding:.45rem .6rem;border-bottom:1px solid var(--bg3);vertical-align:top;}
+.lang-table td:first-child{color:var(--accent2);font-family:'SF Mono','Fira Code',monospace;white-space:nowrap;}
+.lang-table td:last-child{color:var(--muted);line-height:1.5;}
+.lang-table tr:hover td{background:var(--bg3);}
+.section-title{font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin:.8rem 0 .4rem;}
 </style>
 </head>
 <body>
@@ -190,12 +216,12 @@ button.primary:hover{background:#6d28d9;}
           <span class="icon">📂</span>
           Fetch diff<br>Delta since last review
         </div>
-        <div class="node" id="n-filter" style="top:130px;left:172px;width:150px;">
+        <div class="node clickable" id="n-filter" style="top:130px;left:172px;width:150px;" onclick="openModal('filter')">
           <div class="step-badge">9</div>
           <span class="icon">🔍</span>
           Filter files<br>Skip 40+ ext · cap 20
         </div>
-        <div class="node" id="n-hints" style="top:245px;left:10px;width:150px;">
+        <div class="node clickable" id="n-hints" style="top:245px;left:10px;width:150px;" onclick="openModal('hints')">
           <div class="step-badge">10</div>
           <span class="icon">💡</span>
           Inject language hints<br><span style="color:var(--muted);font-size:.68rem;">23 ext → Claude prompt</span>
@@ -266,6 +292,97 @@ button.primary:hover{background:#6d28d9;}
   <div class="leg"><div class="leg-dot" style="background:rgba(167,139,250,.2);border-color:#a78bfa;"></div>ai-judge repo storage</div>
   <div class="leg"><div class="leg-dot" style="background:rgba(124,58,237,.3);border-color:#7c3aed;border-style:dashed;"></div>Animated data flow</div>
 </div>
+
+<!-- MODAL -->
+<div class="modal-backdrop" id="modal-backdrop" onclick="closeModalOutside(event)">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="modal-title"></h3>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+  </div>
+</div>
+
+<script>
+const MODAL_CONTENT = {
+  filter: {
+    title: "🔍 File Filter — Skipped Extensions & Filenames",
+    html: `
+      <p>Before calling Claude, every file in the PR diff is checked. Files matching any of the below are skipped entirely — they contain no reviewable logic.</p>
+      <div class="section-title">Skipped Extensions</div>
+      <div class="tag-grid">
+        <span class="tag skip">.html</span><span class="tag skip">.htm</span><span class="tag skip">.md</span><span class="tag skip">.rst</span><span class="tag skip">.txt</span><span class="tag skip">.rtf</span><span class="tag skip">.apib</span>
+        <span class="tag skip">.css</span><span class="tag skip">.scss</span><span class="tag skip">.sass</span>
+        <span class="tag skip">.csv</span><span class="tag skip">.tsv</span>
+        <span class="tag skip">.feature</span><span class="tag skip">.mustache</span><span class="tag skip">.hbs</span>
+        <span class="tag skip">.g4</span><span class="tag skip">.pegjs</span>
+        <span class="tag skip">.min.js</span><span class="tag skip">.min.css</span>
+        <span class="tag skip">.json</span><span class="tag skip">.xml</span><span class="tag skip">.yaml</span><span class="tag skip">.yml</span><span class="tag skip">.toml</span><span class="tag skip">.ini</span><span class="tag skip">.cfg</span>
+        <span class="tag skip">.png</span><span class="tag skip">.jpg</span><span class="tag skip">.jpeg</span><span class="tag skip">.gif</span><span class="tag skip">.svg</span><span class="tag skip">.ico</span><span class="tag skip">.woff</span><span class="tag skip">.woff2</span><span class="tag skip">.ttf</span>
+        <span class="tag skip">.pdf</span><span class="tag skip">.zip</span><span class="tag skip">.tar</span><span class="tag skip">.gz</span>
+      </div>
+      <div class="section-title">Skipped Filenames (exact match)</div>
+      <div class="tag-grid">
+        <span class="tag skip">package-lock.json</span><span class="tag skip">yarn.lock</span><span class="tag skip">poetry.lock</span><span class="tag skip">Gemfile.lock</span>
+        <span class="tag skip">go.sum</span><span class="tag skip">Pipfile.lock</span><span class="tag skip">composer.lock</span>
+        <span class="tag skip">Dockerfile</span><span class="tag skip">Makefile</span><span class="tag skip">gradlew</span><span class="tag skip">gradlew.bat</span>
+      </div>
+      <div class="section-title">Cost Cap</div>
+      <p>Even after filtering, if more than <strong style="color:var(--accent2)">20 files</strong> remain, only the first 20 are reviewed. A warning comment is posted on the PR listing how many were skipped.</p>
+    `
+  },
+  hints: {
+    title: "💡 Per-Language Hints — Injected into Claude Prompt",
+    html: `
+      <p>For each file, a language-specific guidance string is injected into the user message sent to Claude. This sharpens bug detection by telling Claude what patterns to watch for in that language. Adds ~30–50 tokens per call.</p>
+      <table class="lang-table">
+        <tr><th>Extension(s)</th><th>Guidance injected</th></tr>
+        <tr><td>.py</td><td>Mutable default arguments, <code>is</code> vs <code>==</code>, silent exception swallowing, integer division (<code>/</code> vs <code>//</code>), generator exhaustion</td></tr>
+        <tr><td>.java</td><td>NullPointerException risks, <code>equals()</code> vs <code>==</code>, unchecked exceptions, integer division truncation, off-by-one in collections</td></tr>
+        <tr><td>.scala</td><td>Option.get on None, non-exhaustive pattern matches, integer division truncation, <code>equals()</code> vs <code>eq()</code>, mutable shared state</td></tr>
+        <tr><td>.kt</td><td>Null safety operator misuse (<code>!!</code>), smart cast invalidation, integer division, coroutine cancellation not handled</td></tr>
+        <tr><td>.groovy</td><td>NullPointerException, Groovy truth pitfalls (0 and '' are falsy), GString injection, dynamic dispatch surprises</td></tr>
+        <tr><td>.go</td><td>Ignored error returns, goroutine leaks, nil pointer dereference, slice off-by-one, <code>defer</code> inside loops</td></tr>
+        <tr><td>.rs</td><td><code>unwrap()</code>/<code>expect()</code> on None/Err, integer overflow in debug vs release, off-by-one in index ops, borrow checker workarounds</td></tr>
+        <tr><td>.c</td><td>Buffer overflows, null pointer dereference, integer overflow/underflow, use-after-free, missing bounds checks, signed/unsigned comparison</td></tr>
+        <tr><td>.cpp</td><td>All C issues plus object slicing, virtual dispatch issues, RAII violations, iterator invalidation</td></tr>
+        <tr><td>.ts</td><td>null/undefined not handled, missing <code>await</code>, type assertions (<code>as</code>) bypassing runtime checks, off-by-one in array loops</td></tr>
+        <tr><td>.js</td><td><code>==</code> vs <code>===</code>, undefined/null not handled, async errors silently ignored, off-by-one, <code>this</code> binding issues</td></tr>
+        <tr><td>.rb</td><td>nil handling, method_missing pitfalls, mutable object sharing, <code>rescue Exception</code> catching too broadly</td></tr>
+        <tr><td>.pl</td><td>undef handling, string vs number context confusion, regex capture group off-by-one, wantarray context bugs</td></tr>
+        <tr><td>.lua</td><td>1-based indexing errors, nil handling, table mutation during iteration, local vs global variable shadowing</td></tr>
+        <tr><td>.sh / .bash</td><td>Unquoted variables (word splitting), missing exit code checks, <code>pipefail</code> not set, command injection</td></tr>
+        <tr><td>.ps1</td><td>Unchecked <code>$?</code>, null/empty string handling, pipeline errors silently ignored, implicit type coercion</td></tr>
+        <tr><td>.bat</td><td>Missing ERRORLEVEL checks, variable expansion issues, logic errors in IF/FOR constructs</td></tr>
+        <tr><td>.sql</td><td>UPDATE/DELETE without WHERE, NULL comparison using <code>=</code> instead of <code>IS NULL</code>, missing transaction rollback, off-by-one in LIMIT/OFFSET</td></tr>
+        <tr><td>.hcl</td><td><code>count</code> vs <code>for_each</code> logic errors, incorrect resource references, missing <code>depends_on</code>, incorrect conditional expressions</td></tr>
+        <tr><td>.yar / .yara</td><td>Condition logic inversions, <code>any of</code> vs <code>all of</code> semantics, overlapping string definitions, incorrect offset calculations</td></tr>
+        <tr><td>.xsl / .xslt</td><td>XPath predicate logic errors, missing default templates causing silent data loss, incorrect <code>select</code> expressions</td></tr>
+      </table>
+    `
+  }
+};
+
+function openModal(key) {
+  const content = MODAL_CONTENT[key];
+  document.getElementById('modal-title').textContent = content.title;
+  document.getElementById('modal-body').innerHTML = content.html;
+  document.getElementById('modal-backdrop').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeModal() {
+  document.getElementById('modal-backdrop').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+function closeModalOutside(e) {
+  if (e.target === document.getElementById('modal-backdrop')) closeModal();
+}
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+</script>
 
 <script>
 const STEPS = [
