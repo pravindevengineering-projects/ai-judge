@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Judge — Review Log Viewer</title>
+<style>
+:root {
+  --bg:#0d1117; --bg2:#161b22; --bg3:#21262d; --border:#30363d;
+  --text:#e6edf3; --muted:#8b949e;
+  --accent:#7c3aed; --accent2:#a78bfa; --green:#3fb950; --yellow:#e3b341;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;min-height:100vh;}
+
+nav{background:rgba(13,17,23,.96);border-bottom:1px solid var(--border);padding:0 1.5rem;display:flex;align-items:center;justify-content:space-between;height:52px;}
+.logo{font-weight:700;font-size:1rem;color:var(--accent2);}
+.nav-right{font-size:.82rem;color:var(--muted);}
+
+/* DROP ZONE */
+.drop-zone{margin:2rem auto;max-width:520px;border:2px dashed var(--border);border-radius:12px;padding:3rem 2rem;text-align:center;transition:all .2s;cursor:pointer;}
+.drop-zone:hover,.drop-zone.dragover{border-color:var(--accent2);background:rgba(124,58,237,.06);}
+.drop-zone .dz-icon{font-size:2.5rem;margin-bottom:.75rem;}
+.drop-zone p{color:var(--muted);font-size:.9rem;margin-top:.4rem;}
+.drop-zone label{display:inline-block;margin-top:1rem;background:var(--accent);color:#fff;padding:.4rem 1.1rem;border-radius:6px;font-size:.85rem;cursor:pointer;}
+#file-input{display:none;}
+
+/* STATS ROW */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1rem;padding:0 1.5rem;margin-bottom:1.5rem;}
+.stat-card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:1rem 1.2rem;}
+.stat-card .label{font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;}
+.stat-card .value{font-size:1.6rem;font-weight:700;color:var(--accent2);margin-top:.2rem;}
+.stat-card .sub{font-size:.75rem;color:var(--muted);margin-top:.1rem;}
+
+/* TOOLBAR */
+.toolbar{padding:0 1.5rem;margin-bottom:.75rem;display:flex;gap:.75rem;align-items:center;flex-wrap:wrap;}
+.toolbar input{background:var(--bg2);border:1px solid var(--border);color:var(--text);padding:.35rem .75rem;border-radius:6px;font-size:.85rem;width:220px;}
+.toolbar input:focus{outline:none;border-color:var(--accent2);}
+.toolbar select{background:var(--bg2);border:1px solid var(--border);color:var(--text);padding:.35rem .6rem;border-radius:6px;font-size:.85rem;}
+.toolbar .count{font-size:.82rem;color:var(--muted);margin-left:auto;}
+
+/* TABLE */
+.table-wrap{padding:0 1.5rem 2rem;overflow-x:auto;}
+table{width:100%;border-collapse:collapse;font-size:.83rem;}
+thead th{background:var(--bg3);color:var(--accent2);text-align:left;padding:.65rem .85rem;border-bottom:2px solid var(--border);white-space:nowrap;cursor:pointer;user-select:none;}
+thead th:hover{color:var(--text);}
+thead th .sort-arrow{margin-left:.3rem;opacity:.4;}
+thead th.sorted .sort-arrow{opacity:1;}
+tbody tr{border-bottom:1px solid var(--border);transition:background .15s;}
+tbody tr:hover{background:var(--bg2);}
+tbody td{padding:.6rem .85rem;color:var(--muted);white-space:nowrap;}
+tbody td:first-child{color:var(--text);}
+.badge{display:inline-block;padding:.1rem .5rem;border-radius:4px;font-size:.75rem;font-weight:600;}
+.badge-green{background:#0d2a14;border:1px solid #238636;color:var(--green);}
+.badge-yellow{background:#2a1f00;border:1px solid #9e6a03;color:var(--yellow);}
+.badge-red{background:#3a0d0d;border:1px solid #b85450;color:#f85149;}
+.empty{text-align:center;padding:3rem;color:var(--muted);}
+
+#main{display:none;}
+</style>
+</head>
+<body>
+
+<nav>
+  <span class="logo">⚖️ AI Judge — Review Log Viewer</span>
+  <span class="nav-right" id="file-name">No file loaded</span>
+</nav>
+
+<!-- DROP ZONE -->
+<div id="drop-zone" class="drop-zone">
+  <div class="dz-icon">📋</div>
+  <strong>Drop review_log.csv here</strong>
+  <p>Download the artifact from the GitHub Actions run,<br>then drag it onto this page.</p>
+  <label for="file-input">Browse file</label>
+  <input type="file" id="file-input" accept=".csv">
+</div>
+
+<!-- MAIN CONTENT -->
+<div id="main">
+  <!-- STATS -->
+  <div class="stats" id="stats-row"></div>
+
+  <!-- TOOLBAR -->
+  <div class="toolbar">
+    <input type="text" id="search" placeholder="Filter by repo or PR…" oninput="applyFilters()">
+    <select id="repo-filter" onchange="applyFilters()">
+      <option value="">All repos</option>
+    </select>
+    <span class="count" id="row-count"></span>
+  </div>
+
+  <!-- TABLE -->
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th onclick="sortBy('timestamp')" id="th-timestamp">Timestamp <span class="sort-arrow">↕</span></th>
+          <th onclick="sortBy('repo')" id="th-repo">Repo <span class="sort-arrow">↕</span></th>
+          <th onclick="sortBy('pr_number')" id="th-pr_number">PR <span class="sort-arrow">↕</span></th>
+          <th onclick="sortBy('files_reviewed')" id="th-files_reviewed">Files <span class="sort-arrow">↕</span></th>
+          <th onclick="sortBy('findings')" id="th-findings">Findings <span class="sort-arrow">↕</span></th>
+          <th onclick="sortBy('input_tokens')" id="th-input_tokens">Input Tokens <span class="sort-arrow">↕</span></th>
+          <th onclick="sortBy('output_tokens')" id="th-output_tokens">Output Tokens <span class="sort-arrow">↕</span></th>
+          <th onclick="sortBy('cost_usd')" id="th-cost_usd">Cost (USD) <span class="sort-arrow">↕</span></th>
+        </tr>
+      </thead>
+      <tbody id="table-body"></tbody>
+    </table>
+    <div class="empty" id="empty-msg" style="display:none;">No matching rows.</div>
+  </div>
+</div>
+
+<script>
+let allRows = [];
+let sortCol = 'timestamp';
+let sortDir = -1; // -1 = desc (newest first)
+
+// ── File loading ──────────────────────────────────────────────
+const dz = document.getElementById('drop-zone');
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('dragover'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('dragover'));
+dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('dragover'); loadFile(e.dataTransfer.files[0]); });
+document.getElementById('file-input').addEventListener('change', e => loadFile(e.target.files[0]));
+
+function loadFile(file) {
+  if (!file) return;
+  document.getElementById('file-name').textContent = file.name;
+  const reader = new FileReader();
+  reader.onload = e => parseCSV(e.target.result);
+  reader.readAsText(file);
+}
+
+function parseCSV(text) {
+  const lines = text.trim().split('\n');
+  if (lines.length < 2) return;
+  const headers = lines[0].split(',').map(h => h.trim());
+  allRows = lines.slice(1).map(line => {
+    const vals = line.split(',');
+    const obj = {};
+    headers.forEach((h, i) => { obj[h] = (vals[i] || '').trim(); });
+    obj._pr_num = parseInt(obj.pr_number) || 0;
+    obj._findings = parseInt(obj.findings) || 0;
+    obj._files = parseInt(obj.files_reviewed) || 0;
+    obj._input = parseInt(obj.input_tokens) || 0;
+    obj._output = parseInt(obj.output_tokens) || 0;
+    obj._cost = parseFloat(obj.cost_usd) || 0;
+    return obj;
+  }).filter(r => r.timestamp);
+
+  populateRepoFilter();
+  renderStats(allRows);
+  applyFilters();
+  document.getElementById('drop-zone').style.display = 'none';
+  document.getElementById('main').style.display = 'block';
+}
+
+// ── Repo filter dropdown ──────────────────────────────────────
+function populateRepoFilter() {
+  const repos = [...new Set(allRows.map(r => r.repo))].sort();
+  const sel = document.getElementById('repo-filter');
+  repos.forEach(repo => {
+    const opt = document.createElement('option');
+    opt.value = repo; opt.textContent = repo;
+    sel.appendChild(opt);
+  });
+}
+
+// ── Stats ─────────────────────────────────────────────────────
+function renderStats(rows) {
+  const totalCost = rows.reduce((s, r) => s + r._cost, 0);
+  const totalFindings = rows.reduce((s, r) => s + r._findings, 0);
+  const totalTokens = rows.reduce((s, r) => s + r._input + r._output, 0);
+  const repos = new Set(rows.map(r => r.repo)).size;
+
+  document.getElementById('stats-row').innerHTML = `
+    <div class="stat-card"><div class="label">PRs Reviewed</div><div class="value">${rows.length}</div><div class="sub">across ${repos} repo${repos !== 1 ? 's' : ''}</div></div>
+    <div class="stat-card"><div class="label">Total Findings</div><div class="value">${totalFindings}</div><div class="sub">logic bugs found</div></div>
+    <div class="stat-card"><div class="label">Total Tokens</div><div class="value">${(totalTokens/1000).toFixed(1)}K</div><div class="sub">${(rows.reduce((s,r)=>s+r._input,0)/1000).toFixed(1)}K in · ${(rows.reduce((s,r)=>s+r._output,0)/1000).toFixed(1)}K out</div></div>
+    <div class="stat-card"><div class="label">Total Cost</div><div class="value">$${totalCost.toFixed(4)}</div><div class="sub">Sonnet 4.6 Bedrock pricing</div></div>
+    <div class="stat-card"><div class="label">Avg Findings/PR</div><div class="value">${rows.length ? (totalFindings/rows.length).toFixed(1) : '0'}</div><div class="sub">avg per review</div></div>
+    <div class="stat-card"><div class="label">Avg Cost/PR</div><div class="value">$${rows.length ? (totalCost/rows.length).toFixed(4) : '0.0000'}</div><div class="sub">avg per review</div></div>
+  `;
+}
+
+// ── Filter + sort ─────────────────────────────────────────────
+function applyFilters() {
+  const q = document.getElementById('search').value.toLowerCase();
+  const repo = document.getElementById('repo-filter').value;
+  let rows = allRows.filter(r => {
+    if (repo && r.repo !== repo) return false;
+    if (q && !r.repo.toLowerCase().includes(q) && !r.pr_number.includes(q)) return false;
+    return true;
+  });
+  rows = sortRows(rows);
+  renderTable(rows);
+  document.getElementById('row-count').textContent = `${rows.length} of ${allRows.length} rows`;
+}
+
+function sortRows(rows) {
+  return [...rows].sort((a, b) => {
+    let av = a[sortCol] || '', bv = b[sortCol] || '';
+    const num = ['pr_number','files_reviewed','findings','input_tokens','output_tokens','cost_usd'];
+    if (num.includes(sortCol)) { av = parseFloat(av)||0; bv = parseFloat(bv)||0; }
+    if (av < bv) return sortDir;
+    if (av > bv) return -sortDir;
+    return 0;
+  });
+}
+
+function sortBy(col) {
+  if (sortCol === col) sortDir *= -1;
+  else { sortCol = col; sortDir = -1; }
+  document.querySelectorAll('thead th').forEach(th => th.classList.remove('sorted'));
+  const th = document.getElementById('th-' + col);
+  if (th) {
+    th.classList.add('sorted');
+    th.querySelector('.sort-arrow').textContent = sortDir === -1 ? '↓' : '↑';
+  }
+  applyFilters();
+}
+
+// ── Table render ──────────────────────────────────────────────
+function findingsBadge(n) {
+  if (n === 0) return `<span class="badge badge-green">0</span>`;
+  if (n <= 3)  return `<span class="badge badge-yellow">${n}</span>`;
+  return `<span class="badge badge-red">${n}</span>`;
+}
+
+function renderTable(rows) {
+  const body = document.getElementById('table-body');
+  const empty = document.getElementById('empty-msg');
+  if (!rows.length) { body.innerHTML = ''; empty.style.display = 'block'; return; }
+  empty.style.display = 'none';
+  body.innerHTML = rows.map(r => {
+    const ts = r.timestamp.replace('T',' ').replace('Z',' UTC');
+    const repoShort = r.repo.split('/')[1] || r.repo;
+    const prLink = `<a href="https://github.com/${r.repo}/pull/${r.pr_number}" target="_blank" style="color:var(--accent2);text-decoration:none;">#${r.pr_number}</a>`;
+    return `<tr>
+      <td title="${r.timestamp}">${ts}</td>
+      <td title="${r.repo}">${repoShort}</td>
+      <td>${prLink}</td>
+      <td>${r.files_reviewed}</td>
+      <td>${findingsBadge(r._findings)}</td>
+      <td>${Number(r.input_tokens).toLocaleString()}</td>
+      <td>${Number(r.output_tokens).toLocaleString()}</td>
+      <td>$${r._cost.toFixed(4)}</td>
+    </tr>`;
+  }).join('');
+}
+</script>
+</body>
+</html>
