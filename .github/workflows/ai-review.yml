@@ -8,6 +8,11 @@ on:
         type: string
         required: false
         default: ""
+      reviewer-ref:
+        description: "Tag or branch of the reviewer repo to run (pin to the same tag as the workflow, e.g. v1)"
+        type: string
+        required: false
+        default: ""
     secrets:
       AWS_ACCESS_KEY_ID:
         required: true
@@ -29,6 +34,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: ${{ inputs.reviewer-repo || github.repository }}
+          ref: ${{ inputs.reviewer-ref }}
           token: ${{ secrets.AI_JUDGE_WRITE_TOKEN || secrets.GITHUB_TOKEN }}
 
       - uses: actions/setup-python@v5
@@ -46,27 +52,47 @@ jobs:
           AWS_SESSION_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
           AWS_DEFAULT_REGION: us-west-2
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          AI_JUDGE_LOG_FILE: review_row.csv
 
       - name: Upload review log artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: review-log
-          path: review_log.csv
+          path: review_row.csv
           if-no-files-found: warn
           retention-days: 365
 
-      - name: Commit review log to ai-judge repo
+      - name: Append review row to cumulative log in ai-judge repo
+        continue-on-error: true
         run: |
           if [ -z "$AI_JUDGE_WRITE_TOKEN" ]; then
             echo "AI_JUDGE_WRITE_TOKEN not configured; skipping log commit."
             exit 0
           fi
-          git config user.name "ai-judge[bot]"
-          git config user.email "ai-judge[bot]@users.noreply.github.com"
-          git remote set-url origin "https://x-access-token:${AI_JUDGE_WRITE_TOKEN}@github.com/${{ inputs.reviewer-repo || github.repository }}.git"
-          git add review_log.csv
-          git diff --cached --quiet || git commit -m "chore: log review for ${{ github.repository }}#${{ github.event.pull_request.number }}"
-          git push
+          if [ ! -f review_row.csv ]; then
+            echo "No review row produced; nothing to log."
+            exit 0
+          fi
+          # Concurrent runs from many repos race on the same file: re-clone and retry.
+          for attempt in 1 2 3 4 5; do
+            rm -rf _log
+            git clone --quiet --depth 1 "https://x-access-token:${AI_JUDGE_WRITE_TOKEN}@github.com/${REVIEWER_REPO}.git" _log
+            if [ -f _log/review_log.csv ]; then
+              tail -n +2 review_row.csv >> _log/review_log.csv
+            else
+              cp review_row.csv _log/review_log.csv
+            fi
+            git -C _log add review_log.csv
+            git -C _log -c user.name="ai-judge[bot]" -c user.email="ai-judge[bot]@users.noreply.github.com" \
+              commit --quiet -m "chore: log review for ${{ github.repository }}#${{ github.event.pull_request.number }}"
+            if git -C _log push --quiet; then
+              echo "Logged on attempt $attempt."
+              exit 0
+            fi
+            sleep $(( attempt * 3 + RANDOM % 5 ))
+          done
+          echo "::warning::Could not push review log after 5 attempts."
         env:
           AI_JUDGE_WRITE_TOKEN: ${{ secrets.AI_JUDGE_WRITE_TOKEN }}
+          REVIEWER_REPO: ${{ inputs.reviewer-repo || github.repository }}

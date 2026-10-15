@@ -1,0 +1,29 @@
+# Copy to .ai-judge.yml in the root of a repo that uses AI Judge.
+# Read from the PR's base branch, so changes take effect after they merge.
+
+# Glob patterns (fnmatch; * also matches /) for paths never sent to Claude.
+ignore_paths:
+  - "vendor/*"
+  - "generated/*"
+  - "migrations/*"
+
+# Re-enable extensions that are skipped by default (e.g. GitHub workflow YAML).
+include_extensions:
+  - ".yml"
+
+# Only post findings at or above these levels.
+min_severity: medium      # critical | high | medium | low
+min_confidence: medium    # high | medium | low
+
+max_files: 20             # cost cap per run
+verify: true              # second pass that discards false positives
+security: true            # include security findings (injection, auth, crypto, secrets)
+
+# Extra checks per extension or filename, appended to the built-in hints.
+extra_hints:
+  ".py": "We use SQLAlchemy; flag raw SQL strings."
+  "Dockerfile": "Base images must come from our internal registry."
+
+# Free-text guidance added to the system prompt.
+instructions: |
+  Money values are integers in cents; flag any float arithmetic on prices.

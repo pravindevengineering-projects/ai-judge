@@ -310,7 +310,7 @@ const MODAL_CONTENT = {
         <span class="tag skip">.csv</span><span class="tag skip">.tsv</span>
         <span class="tag skip">.feature</span><span class="tag skip">.mustache</span><span class="tag skip">.hbs</span>
         <span class="tag skip">.g4</span><span class="tag skip">.pegjs</span>
-        <span class="tag skip">.min.js</span><span class="tag skip">.min.css</span>
+        <span class="tag skip">.min.js</span><span class="tag skip">.min.css</span><span class="tag skip">.lock</span><span class="tag skip">.map</span><span class="tag skip">.webp</span>
         <span class="tag skip">.json</span><span class="tag skip">.xml</span><span class="tag skip">.yaml</span><span class="tag skip">.yml</span><span class="tag skip">.toml</span><span class="tag skip">.ini</span><span class="tag skip">.cfg</span>
         <span class="tag skip">.png</span><span class="tag skip">.jpg</span><span class="tag skip">.jpeg</span><span class="tag skip">.gif</span><span class="tag skip">.svg</span><span class="tag skip">.ico</span><span class="tag skip">.woff</span><span class="tag skip">.woff2</span><span class="tag skip">.ttf</span>
         <span class="tag skip">.pdf</span><span class="tag skip">.zip</span><span class="tag skip">.tar</span><span class="tag skip">.gz</span>
@@ -319,10 +319,13 @@ const MODAL_CONTENT = {
       <div class="tag-grid">
         <span class="tag skip">package-lock.json</span><span class="tag skip">yarn.lock</span><span class="tag skip">poetry.lock</span><span class="tag skip">Gemfile.lock</span>
         <span class="tag skip">go.sum</span><span class="tag skip">Pipfile.lock</span><span class="tag skip">composer.lock</span>
-        <span class="tag skip">Dockerfile</span><span class="tag skip">Makefile</span><span class="tag skip">gradlew</span><span class="tag skip">gradlew.bat</span>
+        <span class="tag skip">gradlew</span><span class="tag skip">gradlew.bat</span>
       </div>
+      <p><code>Dockerfile</code> and <code>Makefile</code> <strong>are reviewed</strong> (with their own hints).</p>
+      <div class="section-title">Per-repo overrides (.ai-judge.yml)</div>
+      <p><code>ignore_paths</code> adds glob patterns to skip (e.g. <code>vendor/*</code>); <code>include_extensions</code> re-enables a skipped extension (e.g. <code>.yml</code> for workflow files). Deleted files are always skipped.</p>
       <div class="section-title">Cost Cap</div>
-      <p>Even after filtering, if more than <strong style="color:var(--accent2)">20 files</strong> remain, only the first 20 are reviewed. A warning comment is posted on the PR listing how many were skipped.</p>
+      <p>If more than <strong style="color:var(--accent2)">20 files</strong> (<code>max_files</code>) remain, files are ranked (source before tests, most lines changed first) and only the top 20 are reviewed. The review summary notes how many were skipped.</p>
     `
   },
   validate: {
@@ -334,20 +337,21 @@ const MODAL_CONTENT = {
       <p>Claude may reference a line that exists in the file but wasn't changed in this PR, a line that's off by one, a line from the old version of the file, or a line that doesn't exist at all.</p>
 
       <div class="section-title">The validation check</div>
-      <p>Before posting anything, the diff is parsed to build an exact set of valid line numbers from the hunk headers (<code>@@ -old +new @@</code>). Every finding is then checked against this set:</p>
+      <p>Every diff line is now sent to Claude <strong style="color:var(--accent2)">pre-numbered</strong> with its new-file line number, so Claude copies numbers instead of counting them. Before posting, the diff is also parsed to build an exact set of valid line numbers from the hunk headers (<code>@@ -old +new @@</code>). Every finding is then checked against this set:</p>
       <div class="tag-grid">
         <span class="tag" style="border-color:#3fb950;color:#3fb950;background:#0d2a14;">✅ Line in diff → inline comment</span>
         <span class="tag skip">❌ Line not in diff → fallback comment</span>
+        <span class="tag" style="border-color:#58a6ff;color:#58a6ff;">↕ Multi-line fix → start_line..line, both in one hunk</span>
       </div>
 
       <div class="section-title">422 Fallback — nothing is silently lost</div>
-      <p>Invalid findings are demoted to <strong style="color:var(--accent2)">PR-level comments</strong> (posted in the PR conversation, not anchored to a line). If even the bulk review POST is rejected with 422, each comment is retried <strong style="color:var(--accent2)">one by one</strong> — a single bad comment can't kill all the valid ones.</p>
+      <p>Invalid findings are listed in the <strong style="color:var(--accent2)">review summary</strong> instead of inline. A review is always posted, even with zero findings, so the next push can do an incremental review. If even the bulk review POST is rejected with 422, each comment is retried <strong style="color:var(--accent2)">one by one</strong> — a single bad comment can't kill all the valid ones.</p>
     `
   },
   hints: {
     title: "💡 Per-Language Hints — Injected into Claude Prompt",
     html: `
-      <p>For each file, a language-specific guidance string is injected into the user message sent to Claude. This sharpens bug detection by telling Claude what patterns to watch for in that language. Adds ~30–50 tokens per call.</p>
+      <p>For each file, a language-specific guidance string is injected into the user message sent to Claude. This sharpens bug detection by telling Claude what patterns to watch for in that language. Adds ~30–50 tokens per call. Repos can append their own via <code>extra_hints</code> in <code>.ai-judge.yml</code>.</p>
       <table class="lang-table">
         <tr><th>Extension(s)</th><th>Guidance injected</th></tr>
         <tr><td>.py</td><td>Mutable default arguments, <code>is</code> vs <code>==</code>, silent exception swallowing, integer division (<code>/</code> vs <code>//</code>), generator exhaustion</td></tr>
@@ -357,10 +361,16 @@ const MODAL_CONTENT = {
         <tr><td>.groovy</td><td>NullPointerException, Groovy truth pitfalls (0 and '' are falsy), GString injection, dynamic dispatch surprises</td></tr>
         <tr><td>.go</td><td>Ignored error returns, goroutine leaks, nil pointer dereference, slice off-by-one, <code>defer</code> inside loops</td></tr>
         <tr><td>.rs</td><td><code>unwrap()</code>/<code>expect()</code> on None/Err, integer overflow in debug vs release, off-by-one in index ops, borrow checker workarounds</td></tr>
-        <tr><td>.c</td><td>Buffer overflows, null pointer dereference, integer overflow/underflow, use-after-free, missing bounds checks, signed/unsigned comparison</td></tr>
-        <tr><td>.cpp</td><td>All C issues plus object slicing, virtual dispatch issues, RAII violations, iterator invalidation</td></tr>
-        <tr><td>.ts</td><td>null/undefined not handled, missing <code>await</code>, type assertions (<code>as</code>) bypassing runtime checks, off-by-one in array loops</td></tr>
-        <tr><td>.js</td><td><code>==</code> vs <code>===</code>, undefined/null not handled, async errors silently ignored, off-by-one, <code>this</code> binding issues</td></tr>
+        <tr><td>.c / .h</td><td>Buffer overflows, null pointer dereference, integer overflow/underflow, use-after-free, missing bounds checks, signed/unsigned comparison</td></tr>
+        <tr><td>.cpp / .cc / .hpp</td><td>All C issues plus object slicing, virtual dispatch issues, RAII violations, iterator invalidation</td></tr>
+        <tr><td>.ts / .tsx</td><td>null/undefined not handled, missing <code>await</code>, type assertions (<code>as</code>) bypassing runtime checks, off-by-one in array loops (+ React hook checks for .tsx)</td></tr>
+        <tr><td>.cs</td><td>Null references, <code>async void</code>, missing <code>await</code>, IDisposable not disposed, LINQ deferred execution</td></tr>
+        <tr><td>.swift</td><td>Force unwrap on nil, retain cycles in closures, <code>...</code> vs <code>..&lt;</code> ranges, main-thread UI updates</td></tr>
+        <tr><td>.php</td><td>Loose <code>==</code> comparison, XSS, SQL by concatenation, user-controlled include paths</td></tr>
+        <tr><td>.tf</td><td><code>count</code> vs <code>for_each</code>, missing <code>depends_on</code>, overly permissive IAM / security groups, plain-text secrets</td></tr>
+        <tr><td>Dockerfile</td><td>Running as root, unpinned base images, secrets in layers, cache-busting layer order</td></tr>
+        <tr><td>Makefile</td><td>Missing <code>.PHONY</code>, pipeline errors not failing, wrong prerequisites</td></tr>
+        <tr><td>.js / .mjs / .cjs / .jsx</td><td><code>==</code> vs <code>===</code>, undefined/null not handled, async errors silently ignored, off-by-one, <code>this</code> binding issues</td></tr>
         <tr><td>.rb</td><td>nil handling, method_missing pitfalls, mutable object sharing, <code>rescue Exception</code> catching too broadly</td></tr>
         <tr><td>.pl</td><td>undef handling, string vs number context confusion, regex capture group off-by-one, wantarray context bugs</td></tr>
         <tr><td>.lua</td><td>1-based indexing errors, nil handling, table mutation during iteration, local vs global variable shadowing</td></tr>
