@@ -1,0 +1,1 @@
+- category "security": injection (SQL, shell/command, template, path traversal), broken authentication or access control, hard-coded secrets or credentials, weak or misused cryptography (e.g. MD5/SHA-1 for passwords, predictable tokens), unsafe deserialization.
